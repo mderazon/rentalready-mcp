@@ -1,0 +1,50 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "rentalready-mcp",
+	"account_id": "ccea7f8ae87b58871ac6c255973d9e34",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-04-01",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	// R2 bucket for cached OpenAPI spec
+	"r2_buckets": [
+		{
+			"bucket_name": "rentalready-spec",
+			"binding": "SPEC_BUCKET"
+		}
+	],
+	// KV namespace for OAuth state/token storage
+	"kv_namespaces": [
+		{
+			"binding": "OAUTH_KV",
+			"id": "54a9dc7749c841a0b27c88f095a1ee8d"
+		}
+	],
+	// Daily cron to refresh the OpenAPI spec
+	"triggers": {
+		"crons": [
+			"0 0 * * *"
+		]
+	},
+	"vars": {
+		"RENTALREADY_API_BASE": "https://pms.rentalready.io",
+		"OPENAPI_SPEC_URL": "https://pms.rentalready.io/api/v3/schema/"
+	},
+	"routes": [
+		{
+			"pattern": "rentalready-mcp.treeview.dev",
+			"custom_domain": true
+		}
+	],
+	// Declares required secrets - wrangler deploy fails if any are missing.
+	// Set via `wrangler secret put <KEY>` for production.
+	// For local dev, put values in .dev.vars (never commit that file).
+	"secrets": {
+		"required": [
+			"RENTALREADY_CLIENT_ID",
+			"RENTALREADY_CLIENT_SECRET",
+			"COOKIE_ENCRYPTION_KEY"
+		]
+	}
+}

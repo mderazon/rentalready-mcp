@@ -1,0 +1,9 @@
+interface Env {
+  SPEC_BUCKET: R2Bucket;
+  OAUTH_KV: KVNamespace;
+  RENTALREADY_API_BASE: string;
+  OPENAPI_SPEC_URL: string;
+  RENTALREADY_CLIENT_ID: string;
+  RENTALREADY_CLIENT_SECRET: string;
+  COOKIE_ENCRYPTION_KEY: string;
+}
