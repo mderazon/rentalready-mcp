@@ -53,6 +53,9 @@ async function makeRequest(
   body?: Record<string, unknown>
 ): Promise<{ status: number; data: unknown }> {
   const url = new URL(path, env.RENTALREADY_API_BASE);
+  if (url.origin !== new URL(env.RENTALREADY_API_BASE).origin) {
+    return { status: 400, data: "Invalid API path: must target RentalReady API" };
+  }
 
   if (query) {
     for (const [key, value] of Object.entries(query)) {
