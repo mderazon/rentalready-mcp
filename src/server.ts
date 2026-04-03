@@ -113,8 +113,12 @@ Path parameters like {id} must be substituted with actual values.`,
         body as Record<string, unknown> | undefined
       );
 
+      const text = result.ok
+        ? result.body
+        : `HTTP ${result.status}\n${result.body}`;
+
       return {
-        content: [{ type: "text" as const, text: result.body }],
+        content: [{ type: "text" as const, text }],
         isError: !result.ok,
       };
     }
