@@ -170,15 +170,60 @@ async function fetchUserInfo(
   return { id: "user", email: "unknown" };
 }
 
-export async function handleTokenExchange(options: {
-  grantType: string;
-  props: AuthProps;
-  clientId: string;
-  userId: string;
-  scope: string[];
-  requestedScope: string[];
-}): Promise<{ newProps?: AuthProps; accessTokenTTL?: number } | void> {
-  // We don't perform proactive token exchange because we lack env credentials.
-  // Instead, src/rentalready-api.ts gracefully handles 401s and refreshes dynamically.
+/**
+ * Token exchange callback: refresh RentalReady tokens when they're near expiry.
+ * Called by OAuthProvider when the MCP client refreshes its token.
+ */
+export async function handleTokenExchange(
+  options: {
+    grantType: string;
+    props: AuthProps;
+    clientId: string;
+    userId: string;
+    scope: string[];
+    requestedScope: string[];
+  },
+  env: Env
+): Promise<{ newProps?: AuthProps; accessTokenTTL?: number } | void> {
+  if (options.grantType !== "refresh_token") return undefined;
+
+  const { props } = options;
+  const now = Math.floor(Date.now() / 1000);
+
+  // If RentalReady token expires in less than 5 minutes, proactively refresh it
+  if (props.expiresAt - now < 300 && props.refreshToken) {
+    const tokenResponse = await fetch(RENTALREADY_TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: props.refreshToken,
+        client_id: env.RENTALREADY_CLIENT_ID,
+        client_secret: env.RENTALREADY_CLIENT_SECRET,
+      }),
+    });
+
+    if (tokenResponse.ok) {
+      const tokenData = (await tokenResponse.json()) as {
+        access_token: string;
+        refresh_token?: string;
+        expires_in: number;
+      };
+
+      const newProps: AuthProps = {
+        ...props,
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token ?? props.refreshToken,
+        expiresAt: now + tokenData.expires_in,
+      };
+
+      return {
+        newProps,
+        // Match the MCP token's lifetime exactly to the newly refreshed RentalReady token's lifetime
+        accessTokenTTL: tokenData.expires_in, 
+      };
+    }
+  }
+
   return undefined;
 }

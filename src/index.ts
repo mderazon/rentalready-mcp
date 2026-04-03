@@ -64,17 +64,11 @@ const mcpHandler = {
   },
 };
 
-/**
- * The OAuthProvider wraps everything:
- * - /mcp → authenticated MCP handler
- * - /authorize, /callback → RentalReady OAuth proxy
- * - /token, /register → OAuth provider endpoints
- */
+let currentEnv: Env;
+
 const oauthProvider = new OAuthProvider<Env>({
   apiRoute: "/mcp",
   apiHandler: mcpHandler,
-  // defaultHandler receives non-API requests (authorize, callback, etc.)
-  // OAuthProvider auto-injects env.OAUTH_PROVIDER with OAuthHelpers
   defaultHandler: {
     fetch: async (request: Request, env: Env, ctx: ExecutionContext) => {
       const authApp = createAuthHandler();
@@ -86,7 +80,7 @@ const oauthProvider = new OAuthProvider<Env>({
   clientRegistrationEndpoint: "/register",
   accessTokenTTL: 1800, // 30 minutes
   refreshTokenTTL: 2592000, // 30 days
-  tokenExchangeCallback: handleTokenExchange,
+  tokenExchangeCallback: (options) => handleTokenExchange(options, currentEnv),
 });
 
 export default {
@@ -95,6 +89,7 @@ export default {
     env: Env,
     ctx: ExecutionContext
   ): Promise<Response> {
+    currentEnv = env;
     return oauthProvider.fetch(request, env, ctx);
   },
 
