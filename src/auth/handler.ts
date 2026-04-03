@@ -170,10 +170,6 @@ async function fetchUserInfo(
   return { id: "user", email: "unknown" };
 }
 
-/**
- * Token exchange callback: refresh RentalReady tokens when they're near expiry.
- * Called by OAuthProvider when the MCP client refreshes its token.
- */
 export async function handleTokenExchange(options: {
   grantType: string;
   props: AuthProps;
@@ -182,40 +178,7 @@ export async function handleTokenExchange(options: {
   scope: string[];
   requestedScope: string[];
 }): Promise<{ newProps?: AuthProps; accessTokenTTL?: number } | void> {
-  const { props } = options;
-  const now = Math.floor(Date.now() / 1000);
-
-  // If RentalReady token expires in less than 5 minutes, refresh it
-  if (props.expiresAt - now < 300 && props.refreshToken) {
-    const tokenResponse = await fetch(RENTALREADY_TOKEN_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: props.refreshToken,
-      }),
-    });
-
-    if (tokenResponse.ok) {
-      const tokenData = (await tokenResponse.json()) as {
-        access_token: string;
-        refresh_token?: string;
-        expires_in: number;
-      };
-
-      const newProps: AuthProps = {
-        ...props,
-        accessToken: tokenData.access_token,
-        refreshToken: tokenData.refresh_token ?? props.refreshToken,
-        expiresAt: now + tokenData.expires_in,
-      };
-
-      return {
-        newProps,
-        accessTokenTTL: Math.min(tokenData.expires_in, 1800), // cap at 30 min
-      };
-    }
-  }
-
+  // We don't perform proactive token exchange because we lack env credentials.
+  // Instead, src/rentalready-api.ts gracefully handles 401s and refreshes dynamically.
   return undefined;
 }

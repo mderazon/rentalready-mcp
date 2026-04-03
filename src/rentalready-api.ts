@@ -103,6 +103,8 @@ async function refreshAccessToken(
       body: new URLSearchParams({
         grant_type: "refresh_token",
         refresh_token: props.refreshToken,
+        client_id: _env.RENTALREADY_CLIENT_ID,
+        client_secret: _env.RENTALREADY_CLIENT_SECRET,
       }),
     });
 
