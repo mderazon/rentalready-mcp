@@ -24,13 +24,19 @@ export async function callApi(
   let result = await makeRequest(props.accessToken, env, method, path, query, body);
 
   // If unauthorized, try refreshing the token and retry once.
-  // Note: the refreshed token is only used for this retry — it cannot be persisted
-  // back to the OAuthProvider grant from here. The tokenExchangeCallback handles
-  // durable refresh on the next MCP token refresh cycle.
+  // Mutate props in place so that other tool calls within the same batch request
+  // reuse the refreshed token instead of triggering redundant refreshes.
+  // These changes are scoped to the current request — durable refresh across
+  // requests is handled by tokenExchangeCallback.
   if (result.status === 401 && props.refreshToken) {
     const refreshed = await refreshAccessToken(props, env);
     if (refreshed) {
-      result = await makeRequest(refreshed.accessToken, env, method, path, query, body);
+      props.accessToken = refreshed.accessToken;
+      props.expiresAt = refreshed.expiresAt;
+      if (refreshed.refreshToken) {
+        props.refreshToken = refreshed.refreshToken;
+      }
+      result = await makeRequest(props.accessToken, env, method, path, query, body);
     }
   }
 
