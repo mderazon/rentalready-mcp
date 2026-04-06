@@ -69,10 +69,13 @@ export async function callApi(
   }
 
   const cleaned = stripPhotos(result.data);
+  // Strip the base URL from next/previous pagination URLs so the LLM can use
+  // them directly as paths in execute_read (e.g. "/api/v3/reservations/?offset=10")
+  const responseBody = truncateResponse(cleaned).replaceAll(env.RENTALREADY_API_BASE, "");
   return {
     ok: result.status >= 200 && result.status < 300,
     status: result.status,
-    body: truncateResponse(cleaned),
+    body: responseBody,
   };
 }
 
