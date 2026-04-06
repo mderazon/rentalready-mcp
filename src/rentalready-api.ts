@@ -43,12 +43,6 @@ export async function callApi(
   query?: Record<string, string>,
   body?: Record<string, unknown>
 ): Promise<ApiResult> {
-  // Inject defaults for GET list endpoints to keep responses manageable and recent-first
-  if (method === "GET") {
-    if (!query?.limit) query = { ...query, limit: "10" };
-    if (!query?.ordering) query = { ...query, ordering: "-id" };
-  }
-
   let result = await makeRequest(props.accessToken, env, method, path, query, body);
 
   // If unauthorized, try refreshing the token and retry once.
@@ -96,6 +90,12 @@ async function makeRequest(
     for (const [key, value] of Object.entries(query)) {
       url.searchParams.set(key, value);
     }
+  }
+
+  // Inject defaults for GET list endpoints — only if not already set by path or query
+  if (method === "GET") {
+    if (!url.searchParams.has("limit")) url.searchParams.set("limit", "10");
+    if (!url.searchParams.has("ordering")) url.searchParams.set("ordering", "-id");
   }
 
   const headers: Record<string, string> = {
