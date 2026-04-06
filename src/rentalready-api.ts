@@ -43,9 +43,10 @@ export async function callApi(
   query?: Record<string, string>,
   body?: Record<string, unknown>
 ): Promise<ApiResult> {
-  // Inject a default limit for GET list endpoints to keep responses manageable
-  if (method === "GET" && !query?.limit) {
-    query = { ...query, limit: "10" };
+  // Inject defaults for GET list endpoints to keep responses manageable and recent-first
+  if (method === "GET") {
+    if (!query?.limit) query = { ...query, limit: "10" };
+    if (!query?.ordering) query = { ...query, ordering: "-id" };
   }
 
   let result = await makeRequest(props.accessToken, env, method, path, query, body);
