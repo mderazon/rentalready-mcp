@@ -14,7 +14,6 @@ interface SearchResult {
     description?: string;
   }>;
   requestBody?: unknown;
-  successResponse?: unknown;
 }
 
 const METHOD_SYNONYMS: Record<string, string[]> = {
@@ -26,6 +25,7 @@ const METHOD_SYNONYMS: Record<string, string[]> = {
 };
 
 const MAX_RESULTS = 10;
+const MIN_SCORE = 3; // Require at least one strong match (path segment or tag)
 
 export function searchSpec(spec: ProcessedSpec, query: string): string {
   const tokens = tokenize(query);
@@ -36,7 +36,7 @@ export function searchSpec(spec: ProcessedSpec, query: string): string {
 
     for (const [method, op] of Object.entries(methods)) {
       const score = scoreOperation(tokens, method, pathSegments, op);
-      if (score > 0) {
+      if (score >= MIN_SCORE) {
         scored.push({
           score,
           result: formatResult(method, path, op),
@@ -131,16 +131,6 @@ function formatResult(
   }
 
   if (op.requestBody) result.requestBody = op.requestBody;
-
-  // Include only the success response schema (200 or 201)
-  const successKey = op.responses?.["200"]
-    ? "200"
-    : op.responses?.["201"]
-      ? "201"
-      : undefined;
-  if (successKey && op.responses?.[successKey]) {
-    result.successResponse = op.responses[successKey];
-  }
 
   return result;
 }

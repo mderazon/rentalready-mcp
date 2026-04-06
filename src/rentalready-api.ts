@@ -13,6 +13,28 @@ export interface ApiResult {
  * Make an authenticated API call to RentalReady using the user's tokens.
  * Automatically refreshes the access token on 401.
  */
+// Arrays of objects where every item only has a "picture" key — not useful for LLMs
+const PHOTO_FIELDS = new Set(["images", "listing_photos", "pictures", "photos"]);
+
+function stripPhotos(data: unknown): unknown {
+  if (Array.isArray(data)) {
+    return data.map(stripPhotos);
+  }
+  if (data !== null && typeof data === "object") {
+    const obj = data as Record<string, unknown>;
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (PHOTO_FIELDS.has(key) && Array.isArray(value)) {
+        // Drop the array entirely
+        continue;
+      }
+      result[key] = stripPhotos(value);
+    }
+    return result;
+  }
+  return data;
+}
+
 export async function callApi(
   props: AuthProps,
   env: Env,
@@ -21,6 +43,11 @@ export async function callApi(
   query?: Record<string, string>,
   body?: Record<string, unknown>
 ): Promise<ApiResult> {
+  // Inject a default limit for GET list endpoints to keep responses manageable
+  if (method === "GET" && !query?.limit) {
+    query = { ...query, limit: "10" };
+  }
+
   let result = await makeRequest(props.accessToken, env, method, path, query, body);
 
   // If unauthorized, try refreshing the token and retry once.
@@ -40,10 +67,11 @@ export async function callApi(
     }
   }
 
+  const cleaned = stripPhotos(result.data);
   return {
     ok: result.status >= 200 && result.status < 300,
     status: result.status,
-    body: truncateResponse(result.data),
+    body: truncateResponse(cleaned),
   };
 }
 
@@ -88,7 +116,13 @@ async function makeRequest(
   if (contentType.includes("application/json")) {
     data = await response.json();
   } else {
-    data = await response.text();
+    const text = await response.text();
+    // Don't pass raw HTML to the LLM — return a clean error instead
+    if (contentType.includes("text/html") || text.trimStart().startsWith("<!")) {
+      data = `HTTP ${response.status} ${response.statusText || "Error"} (server returned HTML instead of JSON)`;
+    } else {
+      data = text;
+    }
   }
 
   return { status: response.status, data };
