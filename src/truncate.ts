@@ -1,4 +1,4 @@
-const MAX_CHARS = 24000; // ~6K tokens
+const MAX_CHARS = 48000; // ~12K tokens
 
 export function truncateResponse(data: unknown): string {
   const text =

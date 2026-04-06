@@ -16,6 +16,29 @@ export interface ApiResult {
 // Arrays of objects where every item only has a "picture" key — not useful for LLMs
 const PHOTO_FIELDS = new Set(["images", "listing_photos", "pictures", "photos"]);
 
+function isDrfList(data: unknown): boolean {
+  if (data === null || typeof data !== "object" || Array.isArray(data)) return false;
+  const obj = data as Record<string, unknown>;
+  return typeof obj.count === "number" && Array.isArray(obj.results);
+}
+
+function stripEmpty(data: unknown): unknown {
+  if (Array.isArray(data)) {
+    return data.map(stripEmpty);
+  }
+  if (data !== null && typeof data === "object") {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+      if (value === null || value === "" || (Array.isArray(value) && value.length === 0)) {
+        continue;
+      }
+      result[key] = stripEmpty(value);
+    }
+    return result;
+  }
+  return data;
+}
+
 function stripPhotos(data: unknown): unknown {
   if (Array.isArray(data)) {
     return data.map(stripPhotos);
@@ -62,7 +85,8 @@ export async function callApi(
     }
   }
 
-  const cleaned = stripPhotos(result.data);
+  const stripped = stripPhotos(result.data);
+  const cleaned = isDrfList(stripped) ? stripEmpty(stripped) : stripped;
   // Strip the base URL from next/previous pagination URLs so the LLM can use
   // them directly as paths in execute_read (e.g. "/api/v3/reservations/?offset=10")
   const responseBody = truncateResponse(cleaned).replaceAll(env.RENTALREADY_API_BASE, "");

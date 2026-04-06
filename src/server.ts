@@ -78,21 +78,54 @@ Examples:
   });
 
   server.registerTool(
-    "execute_read",
+    "execute_list",
     {
-      title: "Read RentalReady API",
-      description: `Execute a GET (read-only) API call against the RentalReady PMS API.
+      title: "List RentalReady Resources",
+      description: `Execute a GET request against a paginated list endpoint of the RentalReady PMS API.
+
+Use this when browsing multiple resources, paginating through results, or aggregating data
+(e.g. listing reservations, rentals, guests). Returns compact records optimized for browsing.
 
 Use the 'search' tool first to find the right endpoint, then call this tool.
 The path should come directly from search results (e.g. /api/v3/reservations/).
-Path parameters like {id} must be substituted with actual values.`,
+Pagination: pass the 'next' path from a previous response to fetch the next page.`,
       inputSchema: {
-        method: z
-          .literal("GET")
-          .describe("HTTP method — always GET for this tool"),
         path: z
           .string()
-          .describe("API path, e.g. /api/v3/reservations/ or /api/v3/rentals/123/"),
+          .describe("API path, e.g. /api/v3/reservations/ or /api/v3/rentals/"),
+        query: z
+          .record(z.string(), z.string())
+          .optional()
+          .describe("Query parameters as key-value pairs, e.g. { limit: '20', offset: '0' }"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ path, query }) => {
+      const err = validatePath(path);
+      if (err) return err;
+      const result = await callApi(props, env, "GET", path, query as Record<string, string> | undefined);
+      return formatResult(result);
+    }
+  );
+
+  server.registerTool(
+    "execute_read",
+    {
+      title: "Read RentalReady Resource",
+      description: `Execute a GET request to read a single resource by ID from the RentalReady PMS API.
+
+Use this when you need the full details of one specific resource (e.g. /api/v3/reservations/123/).
+Path parameters like {id} must be substituted with actual values.
+
+Use the 'search' tool first to find the right endpoint, then call this tool.`,
+      inputSchema: {
+        path: z
+          .string()
+          .describe("API path with ID, e.g. /api/v3/reservations/123/ or /api/v3/rentals/456/"),
         query: z
           .record(z.string(), z.string())
           .optional()
@@ -104,10 +137,10 @@ Path parameters like {id} must be substituted with actual values.`,
         openWorldHint: true,
       },
     },
-    async ({ method, path, query }) => {
+    async ({ path, query }) => {
       const err = validatePath(path);
       if (err) return err;
-      const result = await callApi(props, env, method, path, query as Record<string, string> | undefined);
+      const result = await callApi(props, env, "GET", path, query as Record<string, string> | undefined);
       return formatResult(result);
     }
   );
