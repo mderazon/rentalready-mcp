@@ -48,6 +48,11 @@ Examples:
             "Search query - describe what API operation you need"
           ),
       },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: false,
+      },
     },
     async ({ query }) => {
       const results = searchSpec(spec, query);
