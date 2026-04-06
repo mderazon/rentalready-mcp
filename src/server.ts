@@ -18,7 +18,7 @@ export function createServer(
     { name: "rentalready", version: "1.0.0" },
     {
       instructions:
-        "RentalReady PMS API. Use the search tool to find API endpoints, then use execute to call them.",
+        "RentalReady PMS API. Use the search tool to find API endpoints, then use execute_read for GET requests and execute_write for POST/PUT/PATCH/DELETE requests.",
     }
   );
 
@@ -57,24 +57,79 @@ Examples:
     }
   );
 
+  const validatePath = (path: string) => {
+    if (!path.startsWith("/api/")) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: "Error: path must start with /api/. Use the search tool to find valid endpoints.",
+          },
+        ],
+        isError: true,
+      };
+    }
+    return null;
+  };
+
+  const formatResult = (result: { ok: boolean; status: number; body: string }) => ({
+    content: [{ type: "text" as const, text: result.ok ? result.body : `HTTP ${result.status}\n${result.body}` }],
+    isError: !result.ok,
+  });
+
   server.registerTool(
-    "execute",
+    "execute_read",
     {
-      title: "Execute RentalReady API Call",
-      description: `Execute an API call against the RentalReady PMS API.
+      title: "Read RentalReady API",
+      description: `Execute a GET (read-only) API call against the RentalReady PMS API.
 
 Use the 'search' tool first to find the right endpoint, then call this tool.
 The path should come directly from search results (e.g. /api/v3/reservations/).
 Path parameters like {id} must be substituted with actual values.`,
       inputSchema: {
         method: z
-          .enum(["GET", "POST", "PUT", "PATCH", "DELETE"])
+          .literal("GET")
+          .describe("HTTP method — always GET for this tool"),
+        path: z
+          .string()
+          .describe("API path, e.g. /api/v3/reservations/ or /api/v3/rentals/123/"),
+        query: z
+          .record(z.string(), z.string())
+          .optional()
+          .describe("Query parameters as key-value pairs"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ method, path, query }) => {
+      const err = validatePath(path);
+      if (err) return err;
+      const result = await callApi(props, env, method, path, query as Record<string, string> | undefined);
+      return formatResult(result);
+    }
+  );
+
+  server.registerTool(
+    "execute_write",
+    {
+      title: "Write RentalReady API",
+      description: `Execute a write (POST, PUT, PATCH, DELETE) API call against the RentalReady PMS API.
+
+Use the 'search' tool first to find the right endpoint, then call this tool.
+The path should come directly from search results (e.g. /api/v3/reservations/).
+Path parameters like {id} must be substituted with actual values.
+
+WARNING: This tool modifies data. Double-check the path and body before calling.`,
+      inputSchema: {
+        method: z
+          .enum(["POST", "PUT", "PATCH", "DELETE"])
           .describe("HTTP method"),
         path: z
           .string()
-          .describe(
-            "API path, e.g. /api/v3/reservations/ or /api/v3/rentals/123/"
-          ),
+          .describe("API path, e.g. /api/v3/reservations/ or /api/v3/rentals/123/"),
         query: z
           .record(z.string(), z.string())
           .optional()
@@ -91,19 +146,8 @@ Path parameters like {id} must be substituted with actual values.`,
       },
     },
     async ({ method, path, query, body }) => {
-      // Validate the path is a RentalReady API path
-      if (!path.startsWith("/api/")) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: "Error: path must start with /api/. Use the search tool to find valid endpoints.",
-            },
-          ],
-          isError: true,
-        };
-      }
-
+      const err = validatePath(path);
+      if (err) return err;
       const result = await callApi(
         props,
         env,
@@ -112,15 +156,7 @@ Path parameters like {id} must be substituted with actual values.`,
         query as Record<string, string> | undefined,
         body as Record<string, unknown> | undefined
       );
-
-      const text = result.ok
-        ? result.body
-        : `HTTP ${result.status}\n${result.body}`;
-
-      return {
-        content: [{ type: "text" as const, text }],
-        isError: !result.ok,
-      };
+      return formatResult(result);
     }
   );
 
